@@ -59,3 +59,10 @@ def analyze_measured_probe_batch(payload: ProbeBatch):
         return analyze_batch(payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+from .remediation import RemediationReport, analyze_remediation
+
+
+@app.post("/api/remediation/analyze")
+def analyze_remediation_report(payload: RemediationReport):
+    return analyze_remediation(payload)
