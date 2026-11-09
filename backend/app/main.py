@@ -103,3 +103,10 @@ from .medium_models import MediumBudgetRequest, calculate_budget
 @app.post("/api/models/link-budget")
 def evaluate_medium_budget(payload: MediumBudgetRequest):
     return calculate_budget(payload)
+
+from .ns3_results import Ns3WifiRun, inspect_ns3_run
+
+
+@app.post("/api/ns3/wifi/inspect")
+def inspect_ns3_wifi_result(payload: Ns3WifiRun):
+    return inspect_ns3_run(payload)
