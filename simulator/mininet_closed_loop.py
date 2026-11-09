@@ -85,12 +85,11 @@ def run(loss: float, count: int, tolerance: float):
             actions.append({"type": "remove_injected_loss", "target": fault_link})
             time.sleep(1)
             recovered = measure(hosts, count)
+            # Both independent crossing paths must show fault impact and recovery.
+            crossing_pairs = (("h1", "h4"), ("h2", "h3"))
             checks = [
                 verify_recovery(baseline[p], observed[p], recovered[p], tolerance)
-                for p in PAIRS if fault_link in (
-                    # Unique paths on the fixed tree: h1->h4 and h2->h3 cross s1-s2.
-                    ["s1-s2"] if p in (("h1", "h4"), ("h2", "h3")) else []
-                )
+                for p in crossing_pairs
             ]
             verification = {
                 "status": "passed" if checks and all(c["passed"] for c in checks) else "failed",
