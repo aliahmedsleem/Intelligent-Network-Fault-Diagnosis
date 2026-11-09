@@ -49,3 +49,13 @@ def analyze_localization(payload: LocalizationRequest):
         return localize(payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+from .probe_pipeline import ProbeBatch, analyze_batch
+
+
+@app.post("/api/localization/probe-batch")
+def analyze_measured_probe_batch(payload: ProbeBatch):
+    try:
+        return analyze_batch(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
