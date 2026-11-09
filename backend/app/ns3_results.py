@@ -25,7 +25,7 @@ class Ns3WifiRun(BaseModel):
     def check_identity(self):
         if self.mode != "ns3_wifi_packet_simulation":
             raise ValueError("Expected ns3_wifi_packet_simulation")
-        if self.standard != "802.11a_5ghz":
+        if self.standard not in {"802.11a_5ghz", "802.11g_2.4ghz"}:
             raise ValueError("Unsupported ns-3 experiment standard")
         return self
 
