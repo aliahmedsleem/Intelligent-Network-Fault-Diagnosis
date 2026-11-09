@@ -1,7 +1,7 @@
 import ReferenceTopology from "./ReferenceTopology";
 import LinkBudgetLab from "./LinkBudgetLab";
-import { useMemo, useState } from "react";
-import { Activity, ArrowRight, CheckCircle2, CircleAlert, Cpu, GitBranch, Layers3, Network, Play, RadioTower, RotateCcw, ShieldAlert, Wifi, Zap } from "lucide-react";
+import { useState } from "react";
+import { Activity, ArrowRight, CheckCircle2, CircleAlert, Cpu, GitBranch, Network, Play, RadioTower, RotateCcw, ShieldAlert, Zap } from "lucide-react";
 
 type Medium="ethernet"|"fiber"|"wifi_2_4"|"wifi_5"|"microwave";
 type Link={id:string;source:string;target:string;medium:Medium;capacity_mbps:number;delay_ms:number;loss_percent?:number};
@@ -19,7 +19,6 @@ const network:NetworkData={nodes:["CORE","SW-01","FIBER","EDGE","WIFI"],links:[
 {id:"wifi-01",source:"CORE",target:"WIFI",medium:"wifi_5",capacity_mbps:100,delay_ms:4},
 {id:"wifi-02",source:"WIFI",target:"EDGE",medium:"wifi_2_4",capacity_mbps:50,delay_ms:5}
 ]};
-const coords:Record<string,[number,number]>={CORE:[92,183],"SW-01":[264,90],FIBER:[454,90],EDGE:[638,183],WIFI:[355,286]};
 const mediumNames:Record<Medium,string>={ethernet:"Ethernet",fiber:"Fiber optic",wifi_2_4:"Wi-Fi 2.4 GHz",wifi_5:"Wi-Fi 5 GHz",microwave:"Microwave"};
 const fmt=(v:number,unit="")=>v.toLocaleString("en-US",{maximumFractionDigits:2})+(unit?" "+unit:"");
 export default function App(){
@@ -43,7 +42,6 @@ export default function App(){
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
  const [selected,setSelected]=useState<string|null>("fiber-02");
- const link=useMemo(()=>network.links.find(l=>l.id===selected),[selected]);
  const affected=report?.after.link_ids||[];
  const isValid=Number.isFinite(load)&&load>0&&load<=1_000_000&&source!==target;
  const nav:[View,string,typeof Activity][]=[["overview","Overview",Activity],["topology","Topology",Network],["experiments","Experiments",ShieldAlert],["measurements","Measurements",Activity],["localization","Localization",GitBranch],["closed_loop","Closed Loop",RotateCcw],["link_budget","Link Budgets",RadioTower]];
