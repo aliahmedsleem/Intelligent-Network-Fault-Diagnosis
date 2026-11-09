@@ -86,8 +86,8 @@ export default function LinkBudgetLab(){
     {numeric("RX antenna gain (dBi)","rx_gain_dbi",-30,70,0.5)}
     {numeric("Additional loss (dB)","additional_loss_db",0,100,0.5)}
    </>}
-   {numeric("Transmit power (dBm)","tx_power_dbm",-40,30,0.5)}
-   {numeric("Receiver sensitivity (dBm)","receiver_sensitivity_dbm",-50,0,0.5)}
+   {numeric("Transmit power (dBm)","tx_power_dbm",settings.medium==="fiber"?-40:-60,settings.medium==="fiber"?30:60,0.5)}
+   {numeric("Receiver sensitivity (dBm)","receiver_sensitivity_dbm",settings.medium==="fiber"?-50:-130,settings.medium==="fiber"?10:0,0.5)}
   </div>
   <div className="measurement-actions"><button className="primary-button" type="button" disabled={busy}
    onClick={calculate}>{busy?"Calculating...":"Calculate link budget"}</button></div>
