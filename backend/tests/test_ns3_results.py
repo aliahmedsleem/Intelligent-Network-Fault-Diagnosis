@@ -19,3 +19,8 @@ def test_detects_forged_loss_rate():
 
 def test_rejects_wrong_mode():
     assert client.post("/api/ns3/wifi/inspect",json={**run,"mode":"measured_hardware"}).status_code==422
+
+def test_accepts_24ghz_wifi():
+    response=client.post("/api/ns3/wifi/inspect",json={**run,"standard":"802.11g_2.4ghz"})
+    assert response.status_code==200,response.text
+    assert response.json()["audit_status"]=="consistent"
