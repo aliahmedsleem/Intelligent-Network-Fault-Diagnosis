@@ -39,3 +39,13 @@ from .measurements import MeasuredRun, analyze
 def analyze_measurements(payload: MeasuredRun):
     """Analyze imported Mininet measurements; never launch privileged commands."""
     return analyze(payload)
+
+from .localization import LocalizationRequest, localize
+
+
+@app.post("/api/localization/analyze")
+def analyze_localization(payload: LocalizationRequest):
+    try:
+        return localize(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
