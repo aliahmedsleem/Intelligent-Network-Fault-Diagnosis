@@ -1,48 +1,69 @@
-import { useState } from "react";
-import { Activity, Network, ShieldAlert, GitBranch, Play, RotateCcw, CheckCircle2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Activity, ArrowRight, CheckCircle2, CircleAlert, Cpu, GitBranch, Layers3, Network, Play, RadioTower, RotateCcw, ShieldAlert, Wifi, Zap } from "lucide-react";
 
-type Link = {id:string;source:string;target:string;medium:string;capacity_mbps:number;delay_ms:number;loss_percent?:number};
-type Experiment = {network:{nodes:string[];links:Link[]};source:string;target:string;offered_load_mbps:number;failed_link_id:string};
-type Result = {mode:string;before:{path:string[];estimated_throughput_mbps:number;baseline_delay_ms:number;estimated_loss_percent:number};after:{path:string[];estimated_throughput_mbps:number;baseline_delay_ms:number;estimated_loss_percent:number;connected:boolean;diagnosis:string};route_changed:boolean};
-const scenario:Experiment={network:{nodes:["CORE","SW-01","FIBER","EDGE","WIFI"],links:[
+type Medium="ethernet"|"fiber"|"wifi_2_4"|"wifi_5"|"microwave";
+type Link={id:string;source:string;target:string;medium:Medium;capacity_mbps:number;delay_ms:number;loss_percent?:number};
+type NetworkData={nodes:string[];links:Link[]};
+type Report={mode:string;before:Result;after:Result;route_changed:boolean;localization:{known_injected_link_id:string;warning:string}};
+type Result={path:string[];link_ids:string[];connected:boolean;bottleneck_mbps:number;offered_load_mbps:number;estimated_throughput_mbps:number;baseline_delay_ms:number;estimated_loss_percent:number;diagnosis:string};
+type View="overview"|"topology"|"experiments";
+const network:NetworkData={nodes:["CORE","SW-01","FIBER","EDGE","WIFI"],links:[
 {id:"eth-01",source:"CORE",target:"SW-01",medium:"ethernet",capacity_mbps:1000,delay_ms:1},
 {id:"fiber-01",source:"SW-01",target:"FIBER",medium:"fiber",capacity_mbps:500,delay_ms:2},
 {id:"fiber-02",source:"FIBER",target:"EDGE",medium:"fiber",capacity_mbps:500,delay_ms:2},
 {id:"wifi-01",source:"CORE",target:"WIFI",medium:"wifi_5",capacity_mbps:100,delay_ms:4},
 {id:"wifi-02",source:"WIFI",target:"EDGE",medium:"wifi_2_4",capacity_mbps:50,delay_ms:5}
-]},source:"CORE",target:"EDGE",offered_load_mbps:200,failed_link_id:"fiber-02"};
-const positions:Record<string,[number,number]>={CORE:[85,145],"SW-01":[245,70],FIBER:[410,70],EDGE:[575,145],WIFI:[310,225]};
-const metrics=(v:number|undefined,unit:string)=>v===undefined?"—":v.toFixed(2)+" "+unit;
+]};
+const coords:Record<string,[number,number]>={CORE:[92,183],"SW-01":[264,90],FIBER:[454,90],EDGE:[638,183],WIFI:[355,286]};
+const mediumNames:Record<Medium,string>={ethernet:"Ethernet",fiber:"Fiber optic",wifi_2_4:"Wi-Fi 2.4 GHz",wifi_5:"Wi-Fi 5 GHz",microwave:"Microwave"};
+const fmt=(v:number,unit="")=>v.toLocaleString("en-US",{maximumFractionDigits:2})+(unit?" "+unit:"");
 export default function App(){
+ const [view,setView]=useState<View>("overview");
+ const [source,setSource]=useState("CORE");
+ const [target,setTarget]=useState("EDGE");
  const [fault,setFault]=useState("fiber-02");
  const [load,setLoad]=useState(200);
- const [result,setResult]=useState<Result|null>(null);
+ const [report,setReport]=useState<Report|null>(null);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
+ const [selected,setSelected]=useState<string|null>("fiber-02");
+ const link=useMemo(()=>network.links.find(l=>l.id===selected),[selected]);
+ const affected=report?.after.link_ids||[];
+ const isValid=Number.isFinite(load)&&load>0&&load<=1_000_000&&source!==target;
+ const nav:[View,string,typeof Activity][]=[["overview","Overview",Activity],["topology","Topology",Network],["experiments","Experiments",ShieldAlert]];
+ function reset(){setSource("CORE");setTarget("EDGE");setFault("fiber-02");setLoad(200);setReport(null);setError("");setSelected("fiber-02");}
  async function run(){
-  setBusy(true);setError("");
+  if(!isValid)return;
+  setBusy(true);setError("");setReport(null);
   try{
-   const response=await fetch("/api/experiments/link-fault",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...scenario,failed_link_id:fault,offered_load_mbps:load})});
-   if(!response.ok)throw new Error("API returned "+response.status+". Check backend service.");
-   setResult(await response.json());
-  }catch(e){setError(e instanceof Error?e.message:"Unknown error");}finally{setBusy(false);}
+   const response=await fetch("/api/experiments/link-fault",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({network,source,target,offered_load_mbps:load,failed_link_id:fault})});
+   if(!response.ok){const body=await response.json().catch(()=>null);throw new Error(typeof body?.detail==="string"?body.detail:"Experiment failed (HTTP "+response.status+")");}
+   const data:Report=await response.json();setReport(data);setView("experiments");
+  }catch(e){setError(e instanceof Error?e.message:"Unable to complete experiment");}finally{setBusy(false);}
  }
- return <div className="shell">
-  <aside className="sidebar"><div className="brand"><Network size={23}/> <span>NETWORK <b>INTELLIGENCE</b></span></div><div className="nav active"><Activity size={17}/> Overview</div><div className="nav"><GitBranch size={17}/> Topology Laboratory</div><div className="nav"><ShieldAlert size={17}/> Fault Experiments</div><div className="asidefoot">SCIENTIFIC LABORATORY <small>Analytical baseline · v0.1</small></div></aside>
-  <main><header><div><div className="eyebrow">ENGINEERING WORKSPACE / EXPERIMENTS</div><h1>Network Fault Laboratory</h1><p>Deterministic path and link-failure analysis</p></div><div className="status"><span className="dot"/> Analytical engine</div></header>
-  <section className="stats"><article><small>NETWORK NODES</small><strong>05</strong><span>Sample topology</span></article><article><small>ACTIVE LINKS</small><strong>05</strong><span>Hybrid media</span></article><article><small>OFFERED LOAD</small><strong>{load} <em>Mbps</em></strong><span>Configurable experiment</span></article><article><small>EXPERIMENT STATE</small><strong>{result?"Complete":"Ready"}</strong><span>No real packet traffic yet</span></article></section>
-  <div className="columns"><section className="panel topology"><div className="panelhead"><div><h2>Network Topology</h2><p>Five-node reference scenario</p></div><span className="tag">GRAPH MODEL</span></div>
-   <svg viewBox="0 0 660 300" role="img" aria-label="Reference network topology">
-   {scenario.network.links.map(l=>{const a=positions[l.source],b=positions[l.target];return <line key={l.id} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={result&&fault===l.id?"#f87171":"#3f79ad"} strokeWidth="3" strokeDasharray={result&&fault===l.id?"7 5":"none"}/>})}
-   {Object.entries(positions).map(([id,[x,y]])=><g key={id}><rect x={x-43} y={y-20} width="86" height="40" rx="9" fill="#19334d" stroke="#3977a8"/><text x={x} y={y+5} fill="#e8f3ff" textAnchor="middle" fontSize="13" fontWeight="600">{id}</text></g>)}
-   </svg><div className="legend"><span><i className="blue"/> Available link</span><span><i className="red"/> Injected fault</span></div></section>
-   <section className="panel controls"><div className="panelhead"><div><h2>Fault Injection</h2><p>Controlled analytical experiment</p></div><ShieldAlert size={20}/></div>
-   <label htmlFor="fault">Failed link</label><select id="fault" value={fault} onChange={e=>{setFault(e.target.value);setResult(null)}}>{scenario.network.links.map(l=><option key={l.id} value={l.id}>{l.id} · {l.medium}</option>)}</select>
-   <label htmlFor="load">Offered load (Mbps)</label><input id="load" type="number" min="1" max="1000000" value={load} onChange={e=>{setLoad(Number(e.target.value));setResult(null)}}/>
-   <button disabled={busy||load<=0} onClick={run}><Play size={16}/>{busy?"Running...":"Run experiment"}</button><button className="secondary" onClick={()=>{setResult(null);setError("");setLoad(200);setFault("fiber-02")}}><RotateCcw size={16}/> Reset</button>
-   {error&&<div className="error" role="alert">{error}</div>}</section></div>
-   <section className="panel results"><div className="panelhead"><div><h2>Experiment Results</h2><p>Estimated values — not measured network traffic</p></div>{result&&<span className="tag"><CheckCircle2 size={14}/> COMPLETED</span>}</div>
-   {result?<><div className="comparison"><div><small>BASELINE THROUGHPUT</small><strong>{metrics(result.before.estimated_throughput_mbps,"Mbps")}</strong></div><div><small>AFTER FAULT</small><strong>{metrics(result.after.estimated_throughput_mbps,"Mbps")}</strong></div><div><small>BASELINE DELAY</small><strong>{metrics(result.before.baseline_delay_ms,"ms")}</strong></div><div><small>POST-FAULT DELAY</small><strong>{result.after.connected?metrics(result.after.baseline_delay_ms,"ms"):"No route"}</strong></div></div><p className="path">Before: {result.before.path.join(" → ")}<br/>After: {result.after.path.length?result.after.path.join(" → "):"Disconnected"}</p></>:<div className="empty">Run a controlled experiment to compare the baseline path with a failed-link scenario.</div>}
-   </section><footer>RESEARCH MODE · Analytical estimates only · No production network changes</footer>
-  </main></div>;
+ return <div className="app-shell">
+ <aside className="sidebar"><div className="identity"><span className="identity-icon"><Network size={23}/></span><div><strong>NETFAULT<span> / LAB</span></strong><small>ENGINEERING CONSOLE</small></div></div>
+ <div className="nav-heading">WORKSPACE</div><nav aria-label="Primary navigation">{nav.map(([id,label,Icon])=><button key={id} className={"nav-item "+(view===id?"active":"")} onClick={()=>setView(id)} aria-current={view===id?"page":undefined}><Icon size={18}/>{label}{view===id&&<span className="nav-active-dot"/>}</button>)}</nav>
+ <div className="side-spacer"/><div className="system-card"><div className="system-row"><span className="pulse"/> SYSTEM STATUS</div><strong>Analytical engine</strong><small>API-connected experiments</small><div className="system-divider"/><span className="system-version">RESEARCH BUILD · 0.2</span></div><div className="side-bottom">NETWORK FAULT DIAGNOSIS<br/>VIRTUAL LABORATORY</div></aside>
+ <main className="main-content"><header className="topbar"><div><div className="breadcrumbs">LABORATORY <span>/</span> {view.toUpperCase()}</div><h1>{view==="overview"?"Network Overview":view==="topology"?"Network Topology":"Fault Experiments"}</h1><p className="subtitle">{view==="overview"?"Observe the topology and run controlled fault scenarios":view==="topology"?"Inspect virtual links, media and reference parameters":"Compare baseline and fault-injected analytical outcomes"}</p></div><div className="topbar-right"><span className="mode-label"><span className="pulse"/> ANALYTICAL MODE</span><span className="version-label">v0.2</span></div></header>
+ <div className="notice"><CircleAlert size={16}/><span>Research baseline: displayed throughput, loss and delay are <strong>analytical estimates</strong>, not packet-level measurements.</span></div>
+ <section className="metrics"><div className="metric"><div className="metric-top"><span>NETWORK NODES</span><Cpu size={18}/></div><strong>{String(network.nodes.length).padStart(2,"0")}</strong><small>Reference topology</small></div><div className="metric"><div className="metric-top"><span>VIRTUAL LINKS</span><GitBranch size={18}/></div><strong>{String(network.links.length).padStart(2,"0")}</strong><small>Mixed connectivity</small></div><div className="metric"><div className="metric-top"><span>OFFERED LOAD</span><Activity size={18}/></div><strong>{fmt(load)} <em>Mbps</em></strong><small>Configured traffic</small></div><div className="metric"><div className="metric-top"><span>EXPERIMENT</span><Zap size={18}/></div><strong className="metric-state">{busy?"Running":report?"Complete":"Ready"}</strong><small>{report?"Last run available":"Awaiting execution"}</small></div></section>
+ <div className="workspace-grid"><section className="panel topology-panel"><div className="section-header"><div><div className="section-kicker">NETWORK MAP</div><h2>Reference Topology</h2></div><span className="soft-tag"><Layers3 size={14}/> 5 NODES</span></div>
+ <div className="graph-wrap"><svg viewBox="0 0 730 375" role="img" aria-label="Interactive topology graph: click a link to inspect its properties">
+ <defs><pattern id="grid" width="25" height="25" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#28445e" opacity=".55"/></pattern></defs><rect width="730" height="375" fill="url(#grid)"/>
+ {network.links.map(l=>{const a=coords[l.source],b=coords[l.target],failed=report&&fault===l.id,active=report&&affected.includes(l.id),chosen=selected===l.id;return <g key={l.id} onClick={()=>setSelected(l.id)} className="graph-link" role="button" tabIndex={0} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setSelected(l.id)}}} aria-label={"Inspect "+l.id}><line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke="transparent" strokeWidth="25"/><line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={failed?"#ff7285":chosen?"#7ac7ff":active?"#39cda9":"#3b729b"} strokeWidth={chosen?4:3} strokeDasharray={failed?"8 7":l.medium.startsWith("wifi")?"6 7":undefined}/></g>})}
+ {Object.entries(coords).map(([id,[x,y]])=><g key={id}><rect x={x-49} y={y-24} width="98" height="48" rx="11" fill={id===source?"#214967":"#172d44"} stroke={id===source?"#68bfff":"#456c91"} strokeWidth="1.5"/><circle cx={x-34} cy={y} r="4" fill={id===source?"#55d7b7":"#74b7ed"}/><text x={x+5} y={y+5} textAnchor="middle" fill="#eaf4ff" fontSize="13" fontWeight="600">{id}</text></g>)}
+ </svg><div className="graph-legend"><span><i className="legend-line"/> Link</span><span><i className="legend-line wireless"/> Wireless</span><span><i className="legend-line failed"/> Fault</span></div></div>
+ {link&&<div className="link-inspector"><div className="inspector-name"><span className="inspector-dot"/><strong>{link.id}</strong><span>{mediumNames[link.medium]}</span></div><div className="inspector-specs"><span>{link.source} → {link.target}</span><span>{fmt(link.capacity_mbps,"Mbps")}</span><span>{fmt(link.delay_ms,"ms")}</span></div></div>}
+ </section>
+ <section className="panel experiment-panel"><div className="section-header"><div><div className="section-kicker">CONTROL CENTER</div><h2>Fault Injection</h2></div><ShieldAlert size={20} className="panel-icon"/></div>
+ <div className="field-pair"><div className="field"><label htmlFor="source">Source</label><select id="source" value={source} onChange={e=>{setSource(e.target.value);setReport(null)}}>{network.nodes.map(n=><option key={n}>{n}</option>)}</select></div><div className="field"><label htmlFor="target">Destination</label><select id="target" value={target} onChange={e=>{setTarget(e.target.value);setReport(null)}}>{network.nodes.map(n=><option key={n}>{n}</option>)}</select></div></div>
+ <div className="field"><label htmlFor="fault">Faulted link</label><select id="fault" value={fault} onChange={e=>{setFault(e.target.value);setSelected(e.target.value);setReport(null)}}>{network.links.map(l=><option key={l.id} value={l.id}>{l.id} · {mediumNames[l.medium]}</option>)}</select></div>
+ <div className="field"><div className="label-row"><label htmlFor="load">Offered load</label><span>{fmt(load,"Mbps")}</span></div><input id="load" type="range" min="10" max="1000" step="10" value={Math.min(1000,Math.max(10,load))} onChange={e=>{setLoad(Number(e.target.value));setReport(null)}}/><div className="range-labels"><span>10 Mbps</span><span>1000 Mbps</span></div></div>
+ <div className="experiment-actions"><button className="primary-button" disabled={!isValid||busy} onClick={run}><Play size={16}/>{busy?"Running experiment...":"Run Experiment"}<ArrowRight size={16}/></button><button className="reset-button" onClick={reset} title="Reset scenario"><RotateCcw size={17}/></button></div>{source===target&&<p className="form-error">Source and destination must differ.</p>}{error&&<p className="form-error" role="alert">{error}</p>}
+ <div className="control-footer"><RadioTower size={15}/> Fault injection is restricted to the analytical model.</div></section></div>
+ <section className="panel results-panel"><div className="section-header"><div><div className="section-kicker">OBSERVABILITY</div><h2>Experiment Results</h2></div>{report?<span className="success-tag"><CheckCircle2 size={14}/> COMPLETED</span>:<span className="soft-tag">NO RESULTS</span>}</div>
+ {report?<><div className="results-grid"><div className="result-cell"><small>BASELINE THROUGHPUT</small><strong>{fmt(report.before.estimated_throughput_mbps)} <em>Mbps</em></strong></div><div className="result-cell"><small>AFTER FAULT</small><strong>{fmt(report.after.estimated_throughput_mbps)} <em>Mbps</em></strong></div><div className="result-cell"><small>BASELINE DELAY</small><strong>{fmt(report.before.baseline_delay_ms)} <em>ms</em></strong></div><div className="result-cell"><small>POST-FAULT DELAY</small><strong>{report.after.connected?fmt(report.after.baseline_delay_ms):"No route"} <em>{report.after.connected?"ms":""}</em></strong></div></div><div className="route-summary"><div><span>BASELINE PATH</span><strong>{report.before.path.join(" → ")||"Disconnected"}</strong></div><div><span>AFTER FAULT</span><strong>{report.after.path.join(" → ")||"Disconnected"}</strong></div><div><span>DIAGNOSIS</span><strong>{report.after.diagnosis.replaceAll("_"," ")}</strong></div></div></>:<div className="empty-results"><Activity size={28}/><strong>No experiment data yet</strong><span>Configure a link fault and run an experiment to populate the comparison.</span></div>}</section>
+ <footer className="page-footer"><span>NETFAULT LAB · SCIENTIFIC RESEARCH ENVIRONMENT</span><span>ESTIMATES ≠ MEASUREMENTS</span></footer>
+ </main></div>;
 }
