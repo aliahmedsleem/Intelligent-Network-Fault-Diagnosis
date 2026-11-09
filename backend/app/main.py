@@ -110,3 +110,6 @@ from .ns3_results import Ns3WifiRun, inspect_ns3_run
 @app.post("/api/ns3/wifi/inspect")
 def inspect_ns3_wifi_result(payload: Ns3WifiRun):
     return inspect_ns3_run(payload)
+
+from .gns3_adapter import router as gns3_router
+app.include_router(gns3_router)
