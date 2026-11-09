@@ -86,3 +86,13 @@ def evaluate_localization_trials(payload: EvaluationDataset):
         return evaluate_dataset(payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+from .closed_loop import ClosedLoopArtifact, inspect_closed_loop
+
+
+@app.post("/api/lifecycle/inspect")
+def inspect_measured_lifecycle(payload: ClosedLoopArtifact):
+    try:
+        return inspect_closed_loop(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
