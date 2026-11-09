@@ -8,3 +8,5 @@
 
 /* Link-budget laboratory */
 .budget-panel{margin-top:24px}.budget-mediums{display:flex;flex-wrap:wrap;gap:9px;margin:18px 0}.budget-medium{border:1px solid #31506b;border-radius:9px;background:#11263a;color:#a7c3da;padding:11px 15px;font-size:12px;font-weight:600}.budget-medium.selected{background:#214b6d;border-color:#66bfff;color:#e9f6ff}.budget-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:13px;margin:18px 0}.budget-field{display:flex;flex-direction:column;gap:8px;color:#a9bfd5;font-size:12px}.budget-field input,.budget-field select{width:100%;border:1px solid #31506b;background:#102439;border-radius:8px;color:#e9f6ff;padding:11px 12px;min-height:43px}.budget-field input:focus-visible,.budget-field select:focus-visible,.budget-medium:focus-visible{outline:2px solid #72bfff;outline-offset:2px}@media(max-width:580px){.budget-fields{grid-template-columns:1fr 1fr}.budget-medium{flex:1 1 45%}}@media(max-width:390px){.budget-fields{grid-template-columns:1fr}}
+
+.workspace-grid.topology-only{grid-template-columns:minmax(0,1fr)}.workspace-grid.topology-only .reference-topology{width:100%;max-width:100%}
