@@ -66,3 +66,13 @@ from .remediation import RemediationReport, analyze_remediation
 @app.post("/api/remediation/analyze")
 def analyze_remediation_report(payload: RemediationReport):
     return analyze_remediation(payload)
+
+from .lifecycle import LifecycleRequest, plan_lifecycle
+
+
+@app.post("/api/lifecycle/plan")
+def create_lifecycle_plan(payload: LifecycleRequest):
+    try:
+        return plan_lifecycle(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
