@@ -96,3 +96,10 @@ def inspect_measured_lifecycle(payload: ClosedLoopArtifact):
         return inspect_closed_loop(payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+from .medium_models import MediumBudgetRequest, calculate_budget
+
+
+@app.post("/api/models/link-budget")
+def evaluate_medium_budget(payload: MediumBudgetRequest):
+    return calculate_budget(payload)
