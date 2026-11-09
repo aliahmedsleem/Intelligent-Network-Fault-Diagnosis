@@ -16,7 +16,6 @@ const fmt=(n:number)=>n.toLocaleString("en-US",{maximumFractionDigits:2});
 
 export default function ReferenceTopology({nodes,links,selected,onSelect,source,target,failedLink,affectedLinks,hasExperiment}:Props){
  const [showLabels,setShowLabels]=useState(true);
- const [showPaths,setShowPaths]=useState(true);
  const [focus,setFocus]=useState(false);
  const chosen=useMemo(()=>links.find(l=>l.id===selected)||null,[links,selected]);
  const kinds=new Set(links.map(l=>l.medium));
@@ -63,7 +62,7 @@ export default function ReferenceTopology({nodes,links,selected,onSelect,source,
       {(primary||endpoint)&&<g transform="translate(0,43)"><rect x="-29" y="-9" width="58" height="18" rx="9" fill={primary?"#163f54":"#17483d"}/><text y="4" textAnchor="middle" fontSize="9" fontWeight="700" fill={primary?"#8ad8ff":"#7af0c2"}>{primary?"SOURCE":"TARGET"}</text></g>}
      </g>})}
    </svg>
-   <div className="rt-map-footer"><div className="rt-legend"><span><i className="rt-line rt-cable"/> Wired</span><span><i className="rt-line rt-wireless"/> Wireless</span><span><i className="rt-line rt-route"/> Active path</span><span><i className="rt-line rt-fault"/> Fault</span></div><div className="rt-map-controls"><button type="button" aria-pressed={showLabels} onClick={()=>setShowLabels(x=>!x)}>{showLabels?"Hide labels":"Show labels"}</button><button type="button" onClick={()=>{onSelect(null);setShowLabels(true);setShowPaths(true)}}><RotateCcw size={13}/> Reset view</button></div></div>
+   <div className="rt-map-footer"><div className="rt-legend"><span><i className="rt-line rt-cable"/> Wired</span><span><i className="rt-line rt-wireless"/> Wireless</span><span><i className="rt-line rt-route"/> Active path</span><span><i className="rt-line rt-fault"/> Fault</span></div><div className="rt-map-controls"><button type="button" aria-pressed={showLabels} onClick={()=>setShowLabels(x=>!x)}>{showLabels?"Hide labels":"Show labels"}</button><button type="button" onClick={()=>{onSelect(null);setShowLabels(true)}}><RotateCcw size={13}/> Reset view</button></div></div>
   </div>
   <div className="rt-bottom">
    <div className="rt-inspector"><div className="rt-inspector-title"><span className="rt-indicator"/><strong>{chosen?"LINK INSPECTOR":"CONNECTION INSPECTOR"}</strong><small>{chosen?"SELECTED":"AWAITING SELECTION"}</small></div>
