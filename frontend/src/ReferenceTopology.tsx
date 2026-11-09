@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Activity, ArrowUpRight, Cable, CircleDot, GitBranch, Layers3, Maximize2, RadioTower, RotateCcw, Wifi } from "lucide-react";
+import { Activity, ArrowUpRight, Cable, CircleDot, GitBranch, Layers3, Maximize2, RadioTower, RotateCcw } from "lucide-react";
 import "./ReferenceTopology.css";
 
 type Medium = "ethernet"|"fiber"|"wifi_2_4"|"wifi_5"|"microwave";
@@ -36,16 +36,13 @@ export default function ReferenceTopology({nodes,links,selected,onSelect,source,
   </div>
   <div className="rt-canvas">
    <div className="rt-canvas-top"><span><CircleDot size={13}/> INTERACTIVE NETWORK MAP</span>
-    <span>SELECT A LINK TO INSPECT <ArrowUpRight size={13}/></span></div>
+    <span>CLICK A CONNECTION <ArrowUpRight size={12}/></span></div>
    <svg viewBox="0 0 800 390" role="group" aria-label="Interactive five-node network topology. Use Tab and Enter to select a connection.">
     <defs>
      <pattern id="rt-dots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#537895" opacity=".25"/></pattern>
-     <linearGradient id="rt-wire" x1="0" x2="1"><stop stopColor="#5bc8f7"/><stop offset="1" stopColor="#6389ff"/></linearGradient>
      <filter id="rt-glow"><feGaussianBlur stdDeviation="5"/></filter>
     </defs>
     <rect width="800" height="390" fill="url(#rt-dots)"/>
-    <circle cx="400" cy="196" r="142" fill="none" stroke="#36506d" strokeOpacity=".22" strokeDasharray="4 12"/>
-    <circle cx="400" cy="196" r="222" fill="none" stroke="#36506d" strokeOpacity=".14" strokeDasharray="4 12"/>
     {visible.map(l=>{const [x1,y1]=points[l.source],[x2,y2]=points[l.target];const state=status(l);const active=selected===l.id;const color=state==="fault"?"#fb7185":state==="route"?"#4ce2b5":wireless(l.medium)?"#a18bff":"#62b9ef";return <g key={l.id} className="rt-edge" role="button" tabIndex={0} aria-pressed={active} aria-label={l.id+" "+mediumLabel[l.medium]} onClick={()=>onSelect(l.id)} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();onSelect(l.id)}}}>
       <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth="32"/>
       {active&&<line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth="11" opacity=".3" filter="url(#rt-glow)"/>}
@@ -62,13 +59,13 @@ export default function ReferenceTopology({nodes,links,selected,onSelect,source,
       {(primary||endpoint)&&<g transform="translate(0,43)"><rect x="-29" y="-9" width="58" height="18" rx="9" fill={primary?"#163f54":"#17483d"}/><text y="4" textAnchor="middle" fontSize="9" fontWeight="700" fill={primary?"#8ad8ff":"#7af0c2"}>{primary?"SOURCE":"TARGET"}</text></g>}
      </g>})}
    </svg>
-   <div className="rt-map-footer"><div className="rt-legend"><span><i className="rt-line rt-cable"/> Wired</span><span><i className="rt-line rt-wireless"/> Wireless</span><span><i className="rt-line rt-route"/> Active path</span><span><i className="rt-line rt-fault"/> Fault</span></div><div className="rt-map-controls"><button type="button" aria-pressed={showLabels} onClick={()=>setShowLabels(x=>!x)}>{showLabels?"Hide labels":"Show labels"}</button><button type="button" onClick={()=>{onSelect(null);setShowLabels(true)}}><RotateCcw size={13}/> Reset view</button></div></div>
+   <div className="rt-map-footer"><div className="rt-legend"><span><i className="rt-line rt-cable"/> Wired</span><span><i className="rt-line rt-wireless"/> Wireless</span><span><i className="rt-line rt-route"/> Active path</span><span><i className="rt-line rt-fault"/> Fault</span></div><div className="rt-map-controls"><button type="button" aria-pressed={showLabels} onClick={()=>setShowLabels(x=>!x)}>{showLabels?"Hide labels":"Show labels"}</button><button type="button" onClick={()=>{onSelect(null);setShowLabels(true)}}><RotateCcw size={12}/> Reset</button></div></div>
   </div>
   <div className="rt-bottom">
    <div className="rt-inspector"><div className="rt-inspector-title"><span className="rt-indicator"/><strong>{chosen?"LINK INSPECTOR":"CONNECTION INSPECTOR"}</strong><small>{chosen?"SELECTED":"AWAITING SELECTION"}</small></div>
     {chosen?<><div className="rt-link-name"><Cable size={18}/><strong>{chosen.id}</strong><span>{mediumLabel[chosen.medium]}</span></div><div className="rt-details"><div><small>CONNECTION</small><strong>{chosen.source} → {chosen.target}</strong></div><div><small>CAPACITY</small><strong>{fmt(chosen.capacity_mbps)} Mbps</strong></div><div><small>DELAY</small><strong>{fmt(chosen.delay_ms)} ms</strong></div><div><small>SCENARIO</small><strong className={status(chosen)==="fault"?"rt-danger":""}>{status(chosen)==="fault"?"Fault injected":status(chosen)==="route"?"On evaluated path":"Reference link"}</strong></div></div></>:<p>Choose a connection in the network map to inspect its medium, capacity, delay and experiment status.</p>}
    </div>
-   <div className="rt-tip"><Wifi size={18}/><div><strong>Model context</strong><span>Topology links are analytical references. Wireless and fiber packet behavior requires separate simulation or measurements.</span></div></div>
+   
   </div>
  </section>;
 }
