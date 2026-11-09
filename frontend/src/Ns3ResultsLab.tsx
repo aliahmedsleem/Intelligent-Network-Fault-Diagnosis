@@ -26,7 +26,7 @@ export default function Ns3ResultsLab(){
  }
  return <section className="panel ns3-panel">
   <div className="section-header"><div><div className="section-kicker">PACKET-LEVEL SIMULATION</div><h2>ns-3 Wi-Fi Results</h2></div><Wifi size={19} className="panel-icon"/></div>
-  <p className="measured-intro">Import the JSON output from the independent ns-3 802.11a (5 GHz) UDP simulation. This audits reported counters; it does not run ns-3 or verify physical wireless performance.</p>
+  <p className="measured-intro">Import the JSON output from the independent ns-3 802.11a (5 GHz) or 802.11g (2.4 GHz) UDP simulation. This audits reported counters; it does not run ns-3 or verify physical wireless performance.</p>
   <div className="ns3-upload"><label htmlFor="ns3-json"><FileJson size={16}/> Simulation JSON</label><input id="ns3-json" type="file" accept=".json,application/json" onChange={e=>{setFile(e.target.files?.[0]??null);setAudit(null);setError("");}}/><button type="button" className="primary-button" disabled={!file||busy} onClick={inspect}>{busy?"Inspecting...":"Inspect result"}</button></div>
   {error&&<p className="form-error" role="alert">{error}</p>}
   {audit&&<><div className="ns3-status"><ShieldCheck size={17}/><strong>{audit.audit_status==="consistent"?"Counters internally consistent":"Consistency warnings detected"}</strong><span>{audit.experiment.standard}</span></div>
