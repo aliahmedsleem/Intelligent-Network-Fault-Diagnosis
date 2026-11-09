@@ -6,7 +6,8 @@ type Link={id:string;source:string;target:string;medium:Medium;capacity_mbps:num
 type NetworkData={nodes:string[];links:Link[]};
 type Report={mode:string;before:Result;after:Result;route_changed:boolean;localization:{known_injected_link_id:string;warning:string}};
 type Result={path:string[];link_ids:string[];connected:boolean;bottleneck_mbps:number;offered_load_mbps:number;estimated_throughput_mbps:number;baseline_delay_ms:number;estimated_loss_percent:number;diagnosis:string};
-type View="overview"|"topology"|"experiments"|"measurements"|"localization";
+type View="overview"|"topology"|"experiments"|"measurements"|"localization"|"closed_loop";
+type ClosedLoopResult={mode:string;reported_status:string;audit_status:string;quality_flags:string[];inference:LocalizationResult;execution_policy_reported:{authorized:boolean;reason:string;candidate:string|null};probes:{source:string;target:string;baseline_loss_percent:number;observed_loss_percent:number;recovered_loss_percent:number|null}[];ground_truth_evaluation:{link_id:string;top1_correct_recomputed:boolean}};
 type LocalizationResult={status:string;suspected_link_id:string|null;tied_candidates:string[];rankings:{link_id:string;score:number;degraded_paths_covered:number;healthy_paths_contradicted:number}[]};
 type MeasurementReport={mode:string;topology:string;measurements:{before:{throughput_mbps:number|null;loss_percent:number|null;rtt_avg_ms:number|null};after:{throughput_mbps:number|null;loss_percent:number|null;rtt_avg_ms:number|null};throughput_change_mbps:number|null;loss_change_percentage_points:number|null};evidence:string[];quality_flags:string[];localization:{status:string}};
 const network:NetworkData={nodes:["CORE","SW-01","FIBER","EDGE","WIFI"],links:[
@@ -28,6 +29,10 @@ export default function App(){
  const [localization,setLocalization]=useState<LocalizationResult|null>(null);
  const [localizationBusy,setLocalizationBusy]=useState(false);
  const [localizationError,setLocalizationError]=useState("");
+ const [closedLoopFile,setClosedLoopFile]=useState<File|null>(null);
+ const [closedLoopResult,setClosedLoopResult]=useState<ClosedLoopResult|null>(null);
+ const [closedLoopBusy,setClosedLoopBusy]=useState(false);
+ const [closedLoopError,setClosedLoopError]=useState("");
  const [source,setSource]=useState("CORE");
  const [target,setTarget]=useState("EDGE");
  const [fault,setFault]=useState("fiber-02");
@@ -39,8 +44,19 @@ export default function App(){
  const link=useMemo(()=>network.links.find(l=>l.id===selected),[selected]);
  const affected=report?.after.link_ids||[];
  const isValid=Number.isFinite(load)&&load>0&&load<=1_000_000&&source!==target;
- const nav:[View,string,typeof Activity][]=[["overview","Overview",Activity],["topology","Topology",Network],["experiments","Experiments",ShieldAlert],["measurements","Measurements",Activity],["localization","Localization",GitBranch]];
+ const nav:[View,string,typeof Activity][]=[["overview","Overview",Activity],["topology","Topology",Network],["experiments","Experiments",ShieldAlert],["measurements","Measurements",Activity],["localization","Localization",GitBranch],["closed_loop","Closed Loop",RotateCcw]];
  function reset(){setSource("CORE");setTarget("EDGE");setFault("fiber-02");setLoad(200);setReport(null);setError("");setSelected("fiber-02");}
+ async function inspectClosedLoop(){
+  if(!closedLoopFile)return;
+  setClosedLoopBusy(true);setClosedLoopError("");setClosedLoopResult(null);
+  try{
+   if(closedLoopFile.size>2_000_000)throw new Error("JSON file exceeds 2 MB limit");
+   const raw=JSON.parse(await closedLoopFile.text());
+   const response=await fetch("/api/lifecycle/inspect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(raw)});
+   if(!response.ok)throw new Error("Closed-loop inspection failed (HTTP "+response.status+")");
+   setClosedLoopResult(await response.json());
+  }catch(e){setClosedLoopError(e instanceof Error?e.message:"Could not inspect file");}finally{setClosedLoopBusy(false);}
+ }
  async function runLocalization(){
   setLocalizationBusy(true);setLocalizationError("");
   try{
@@ -79,7 +95,7 @@ export default function App(){
  <aside className="sidebar"><div className="identity"><span className="identity-icon"><Network size={23}/></span><div><strong>NETFAULT<span> / LAB</span></strong><small>ENGINEERING CONSOLE</small></div></div>
  <div className="nav-heading">WORKSPACE</div><nav aria-label="Primary navigation">{nav.map(([id,label,Icon])=><button key={id} className={"nav-item "+(view===id?"active":"")} onClick={()=>setView(id)} aria-current={view===id?"page":undefined}><Icon size={18}/>{label}{view===id&&<span className="nav-active-dot"/>}</button>)}</nav>
  <div className="side-spacer"/><div className="system-card"><div className="system-row"><span className="pulse"/> SYSTEM STATUS</div><strong>Analytical engine</strong><small>API-connected experiments</small><div className="system-divider"/><span className="system-version">RESEARCH BUILD · 0.2</span></div><div className="side-bottom">NETWORK FAULT DIAGNOSIS<br/>VIRTUAL LABORATORY</div></aside>
- <main className="main-content"><header className="topbar"><div><div className="breadcrumbs">LABORATORY <span>/</span> {view.toUpperCase()}</div><h1>{view==="overview"?"Network Overview":view==="topology"?"Network Topology":view==="experiments"?"Fault Experiments":view==="measurements"?"Measured Results":"Fault Localization"}</h1><p className="subtitle">{view==="overview"?"Observe the topology and run controlled fault scenarios":view==="topology"?"Inspect virtual links, media and reference parameters":view==="experiments"?"Compare baseline and fault-injected analytical outcomes":view==="measurements"?"Inspect imported Mininet packet measurements":"Explainable multi-path link ranking"}</p></div><div className="topbar-right"><span className="mode-label"><span className="pulse"/> ANALYTICAL MODE</span><span className="version-label">v0.2</span></div></header>
+ <main className="main-content"><header className="topbar"><div><div className="breadcrumbs">LABORATORY <span>/</span> {view.toUpperCase()}</div><h1>{view==="overview"?"Network Overview":view==="topology"?"Network Topology":view==="experiments"?"Fault Experiments":view==="measurements"?"Measured Results":view==="localization"?"Fault Localization":"Closed Loop"}</h1><p className="subtitle">{view==="overview"?"Observe the topology and run controlled fault scenarios":view==="topology"?"Inspect virtual links, media and reference parameters":view==="experiments"?"Compare baseline and fault-injected analytical outcomes":view==="measurements"?"Inspect imported Mininet packet measurements":view==="localization"?"Explainable multi-path link ranking":"Measured diagnosis, gated repair and recovery audit"}</p></div><div className="topbar-right"><span className="mode-label"><span className="pulse"/> ANALYTICAL MODE</span><span className="version-label">v0.2</span></div></header>
  <div className="notice"><CircleAlert size={16}/><span>Research baseline: displayed throughput, loss and delay are <strong>analytical estimates</strong>, not packet-level measurements.</span></div>
  <section className="metrics"><div className="metric"><div className="metric-top"><span>NETWORK NODES</span><Cpu size={18}/></div><strong>{String(network.nodes.length).padStart(2,"0")}</strong><small>Reference topology</small></div><div className="metric"><div className="metric-top"><span>VIRTUAL LINKS</span><GitBranch size={18}/></div><strong>{String(network.links.length).padStart(2,"0")}</strong><small>Mixed connectivity</small></div><div className="metric"><div className="metric-top"><span>OFFERED LOAD</span><Activity size={18}/></div><strong>{fmt(load)} <em>Mbps</em></strong><small>Configured traffic</small></div><div className="metric"><div className="metric-top"><span>EXPERIMENT</span><Zap size={18}/></div><strong className="metric-state">{busy?"Running":report?"Complete":"Ready"}</strong><small>{report?"Last run available":"Awaiting execution"}</small></div></section>
  <div className="workspace-grid"><section className="panel topology-panel"><div className="section-header"><div><div className="section-kicker">NETWORK MAP</div><h2>Reference Topology</h2></div><span className="soft-tag"><Layers3 size={14}/> 5 NODES</span></div>
@@ -108,6 +124,11 @@ export default function App(){
  <div className="measurement-actions"><button className="primary-button" disabled={localizationBusy} onClick={runLocalization}><GitBranch size={16}/>{localizationBusy?"Analyzing...":"Analyze probe paths"}</button></div>
  {localizationError&&<p className="form-error" role="alert">{localizationError}</p>}
  {localization?<><div className="localization-summary"><div><small>STATUS</small><strong>{localization.status.replace(/_/g," ")}</strong></div><div><small>SUSPECTED LINK</small><strong>{localization.suspected_link_id||"Not uniquely identified"}</strong></div></div><div className="ranking-list">{localization.rankings.map((r,i)=><div className="ranking-item" key={r.link_id}><span>{String(i+1).padStart(2,"0")}</span><strong>{r.link_id}</strong><div className="ranking-track"><i style={{width:(Math.max(0,r.score)*100)+"%"}}/></div><em>{r.score.toFixed(2)}</em></div>)}</div><p className="measured-intro">Scores are relative evidence, not probabilities. Equal top candidates remain ambiguous.</p></>:<div className="empty-results"><GitBranch size={26}/><strong>No localization analysis yet</strong><span>Run the illustrative multi-path example to inspect ranked candidate links.</span></div>}</section>
+ <section className="panel measured-panel"><div className="section-header"><div><div className="section-kicker">CLOSED-LOOP / IMPORT</div><h2>Diagnosis to Recovery Audit</h2></div><span className="soft-tag">MEASURED LAB</span></div>
+ <p className="measured-intro">Import a JSON report produced by the dedicated Ubuntu Mininet closed-loop experiment. The API audits recorded data; it does not execute privileged network operations.</p>
+ <div className="measurement-actions"><input aria-label="Select closed-loop experiment JSON" type="file" accept=".json,application/json" onChange={e=>{setClosedLoopFile(e.target.files?.[0]||null);setClosedLoopError("");setClosedLoopResult(null)}}/><button className="primary-button" disabled={!closedLoopFile||closedLoopBusy} onClick={inspectClosedLoop}><RotateCcw size={16}/>{closedLoopBusy?"Inspecting...":"Inspect closed loop"}</button></div>
+ {closedLoopError&&<p className="form-error" role="alert">{closedLoopError}</p>}
+ {closedLoopResult?<><div className="localization-summary"><div><small>AUDIT</small><strong>{closedLoopResult.audit_status}</strong></div><div><small>REPORTED VERIFICATION</small><strong>{closedLoopResult.reported_status}</strong></div><div><small>INFERRED LINK</small><strong>{closedLoopResult.inference.suspected_link_id||"Ambiguous / none"}</strong></div><div><small>LAB ACTION</small><strong>{closedLoopResult.execution_policy_reported.authorized?"Authorized":"Blocked"}</strong></div></div><div className="measurement-evidence"><strong>Quality flags</strong><span>{closedLoopResult.quality_flags.length?closedLoopResult.quality_flags.join(" · "):"No contract inconsistencies detected"}</span><strong>Top-1 match</strong><span>{closedLoopResult.ground_truth_evaluation.top1_correct_recomputed?"Match":"No match"} (evaluation only)</span></div><div className="probe-table-wrap"><table className="probe-table"><thead><tr><th>Path</th><th>Baseline loss</th><th>Fault loss</th><th>Recovery loss</th></tr></thead><tbody>{closedLoopResult.probes.map((p,i)=><tr key={p.source+"-"+p.target+"-"+i}><td>{p.source} → {p.target}</td><td>{fmt(p.baseline_loss_percent)}%</td><td>{fmt(p.observed_loss_percent)}%</td><td>{p.recovered_loss_percent===null?"Not measured":fmt(p.recovered_loss_percent)+"%"}</td></tr>)}</tbody></table></div><p className="measured-intro">A consistent artifact is not proof of physical execution or statistically validated recovery.</p></>:<div className="empty-results"><RotateCcw size={26}/><strong>No closed-loop report imported</strong><span>Run the isolated Mininet experiment, then import its JSON output.</span></div>}</section>
  <footer className="page-footer"><span>NETFAULT LAB · SCIENTIFIC RESEARCH ENVIRONMENT</span><span>ESTIMATES ≠ MEASUREMENTS</span></footer>
  </main></div>;
 }
