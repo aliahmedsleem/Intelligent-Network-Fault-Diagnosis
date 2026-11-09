@@ -76,3 +76,13 @@ def create_lifecycle_plan(payload: LifecycleRequest):
         return plan_lifecycle(payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+from .evaluation import EvaluationDataset, evaluate_dataset
+
+
+@app.post("/api/evaluation/localization")
+def evaluate_localization_trials(payload: EvaluationDataset):
+    try:
+        return evaluate_dataset(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
