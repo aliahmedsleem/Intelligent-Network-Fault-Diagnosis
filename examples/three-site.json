@@ -1,0 +1,14 @@
+{
+  "network": {
+    "nodes": ["A", "B", "C"],
+    "links": [
+      {"id": "ab", "source": "A", "target": "B", "medium": "ethernet", "capacity_mbps": 100, "delay_ms": 1},
+      {"id": "bc", "source": "B", "target": "C", "medium": "fiber", "capacity_mbps": 80, "delay_ms": 2},
+      {"id": "ac", "source": "A", "target": "C", "medium": "microwave", "capacity_mbps": 20, "delay_ms": 10}
+    ]
+  },
+  "source": "A",
+  "target": "C",
+  "offered_load_mbps": 50,
+  "failed_link_id": "bc"
+}
