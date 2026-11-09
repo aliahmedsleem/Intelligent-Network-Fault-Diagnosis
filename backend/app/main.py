@@ -31,3 +31,11 @@ def fault(payload: FaultExperiment):
         return diagnose_fault(payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+from .measurements import MeasuredRun, analyze
+
+
+@app.post("/api/measurements/analyze")
+def analyze_measurements(payload: MeasuredRun):
+    """Analyze imported Mininet measurements; never launch privileged commands."""
+    return analyze(payload)
