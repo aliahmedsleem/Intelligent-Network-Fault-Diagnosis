@@ -6,7 +6,8 @@ type Link={id:string;source:string;target:string;medium:Medium;capacity_mbps:num
 type NetworkData={nodes:string[];links:Link[]};
 type Report={mode:string;before:Result;after:Result;route_changed:boolean;localization:{known_injected_link_id:string;warning:string}};
 type Result={path:string[];link_ids:string[];connected:boolean;bottleneck_mbps:number;offered_load_mbps:number;estimated_throughput_mbps:number;baseline_delay_ms:number;estimated_loss_percent:number;diagnosis:string};
-type View="overview"|"topology"|"experiments";
+type View="overview"|"topology"|"experiments"|"measurements";
+type MeasurementReport={mode:string;topology:string;measurements:{before:{throughput_mbps:number|null;loss_percent:number|null;rtt_avg_ms:number|null};after:{throughput_mbps:number|null;loss_percent:number|null;rtt_avg_ms:number|null};throughput_change_mbps:number|null;loss_change_percentage_points:number|null};evidence:string[];quality_flags:string[];localization:{status:string}};
 const network:NetworkData={nodes:["CORE","SW-01","FIBER","EDGE","WIFI"],links:[
 {id:"eth-01",source:"CORE",target:"SW-01",medium:"ethernet",capacity_mbps:1000,delay_ms:1},
 {id:"fiber-01",source:"SW-01",target:"FIBER",medium:"fiber",capacity_mbps:500,delay_ms:2},
@@ -19,6 +20,10 @@ const mediumNames:Record<Medium,string>={ethernet:"Ethernet",fiber:"Fiber optic"
 const fmt=(v:number,unit="")=>v.toLocaleString("en-US",{maximumFractionDigits:2})+(unit?" "+unit:"");
 export default function App(){
  const [view,setView]=useState<View>("overview");
+ const [measured,setMeasured]=useState<MeasurementReport|null>(null);
+ const [measurementFile,setMeasurementFile]=useState<File|null>(null);
+ const [measurementError,setMeasurementError]=useState("");
+ const [measurementBusy,setMeasurementBusy]=useState(false);
  const [source,setSource]=useState("CORE");
  const [target,setTarget]=useState("EDGE");
  const [fault,setFault]=useState("fiber-02");
@@ -30,8 +35,19 @@ export default function App(){
  const link=useMemo(()=>network.links.find(l=>l.id===selected),[selected]);
  const affected=report?.after.link_ids||[];
  const isValid=Number.isFinite(load)&&load>0&&load<=1_000_000&&source!==target;
- const nav:[View,string,typeof Activity][]=[["overview","Overview",Activity],["topology","Topology",Network],["experiments","Experiments",ShieldAlert]];
+ const nav:[View,string,typeof Activity][]=[["overview","Overview",Activity],["topology","Topology",Network],["experiments","Experiments",ShieldAlert],["measurements","Measurements",Activity]];
  function reset(){setSource("CORE");setTarget("EDGE");setFault("fiber-02");setLoad(200);setReport(null);setError("");setSelected("fiber-02");}
+ async function importMeasurements(){
+  if(!measurementFile)return;
+  setMeasurementBusy(true);setMeasurementError("");
+  try{
+   if(measurementFile.size>2_000_000)throw new Error("JSON file exceeds 2 MB limit");
+   const raw=JSON.parse(await measurementFile.text());
+   const response=await fetch("/api/measurements/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(raw)});
+   if(!response.ok)throw new Error("Invalid measurement data (HTTP "+response.status+")");
+   setMeasured(await response.json());
+  }catch(e){setMeasurementError(e instanceof Error?e.message:"Import failed");}finally{setMeasurementBusy(false);}
+ }
  async function run(){
   if(!isValid)return;
   setBusy(true);setError("");setReport(null);
@@ -45,7 +61,7 @@ export default function App(){
  <aside className="sidebar"><div className="identity"><span className="identity-icon"><Network size={23}/></span><div><strong>NETFAULT<span> / LAB</span></strong><small>ENGINEERING CONSOLE</small></div></div>
  <div className="nav-heading">WORKSPACE</div><nav aria-label="Primary navigation">{nav.map(([id,label,Icon])=><button key={id} className={"nav-item "+(view===id?"active":"")} onClick={()=>setView(id)} aria-current={view===id?"page":undefined}><Icon size={18}/>{label}{view===id&&<span className="nav-active-dot"/>}</button>)}</nav>
  <div className="side-spacer"/><div className="system-card"><div className="system-row"><span className="pulse"/> SYSTEM STATUS</div><strong>Analytical engine</strong><small>API-connected experiments</small><div className="system-divider"/><span className="system-version">RESEARCH BUILD · 0.2</span></div><div className="side-bottom">NETWORK FAULT DIAGNOSIS<br/>VIRTUAL LABORATORY</div></aside>
- <main className="main-content"><header className="topbar"><div><div className="breadcrumbs">LABORATORY <span>/</span> {view.toUpperCase()}</div><h1>{view==="overview"?"Network Overview":view==="topology"?"Network Topology":"Fault Experiments"}</h1><p className="subtitle">{view==="overview"?"Observe the topology and run controlled fault scenarios":view==="topology"?"Inspect virtual links, media and reference parameters":"Compare baseline and fault-injected analytical outcomes"}</p></div><div className="topbar-right"><span className="mode-label"><span className="pulse"/> ANALYTICAL MODE</span><span className="version-label">v0.2</span></div></header>
+ <main className="main-content"><header className="topbar"><div><div className="breadcrumbs">LABORATORY <span>/</span> {view.toUpperCase()}</div><h1>{view==="overview"?"Network Overview":view==="topology"?"Network Topology":view==="experiments"?"Fault Experiments":"Measured Results"}</h1><p className="subtitle">{view==="overview"?"Observe the topology and run controlled fault scenarios":view==="topology"?"Inspect virtual links, media and reference parameters":view==="experiments"?"Compare baseline and fault-injected analytical outcomes":"Inspect imported Mininet packet measurements"}</p></div><div className="topbar-right"><span className="mode-label"><span className="pulse"/> ANALYTICAL MODE</span><span className="version-label">v0.2</span></div></header>
  <div className="notice"><CircleAlert size={16}/><span>Research baseline: displayed throughput, loss and delay are <strong>analytical estimates</strong>, not packet-level measurements.</span></div>
  <section className="metrics"><div className="metric"><div className="metric-top"><span>NETWORK NODES</span><Cpu size={18}/></div><strong>{String(network.nodes.length).padStart(2,"0")}</strong><small>Reference topology</small></div><div className="metric"><div className="metric-top"><span>VIRTUAL LINKS</span><GitBranch size={18}/></div><strong>{String(network.links.length).padStart(2,"0")}</strong><small>Mixed connectivity</small></div><div className="metric"><div className="metric-top"><span>OFFERED LOAD</span><Activity size={18}/></div><strong>{fmt(load)} <em>Mbps</em></strong><small>Configured traffic</small></div><div className="metric"><div className="metric-top"><span>EXPERIMENT</span><Zap size={18}/></div><strong className="metric-state">{busy?"Running":report?"Complete":"Ready"}</strong><small>{report?"Last run available":"Awaiting execution"}</small></div></section>
  <div className="workspace-grid"><section className="panel topology-panel"><div className="section-header"><div><div className="section-kicker">NETWORK MAP</div><h2>Reference Topology</h2></div><span className="soft-tag"><Layers3 size={14}/> 5 NODES</span></div>
@@ -64,6 +80,11 @@ export default function App(){
  <div className="control-footer"><RadioTower size={15}/> Fault injection is restricted to the analytical model.</div></section></div>
  <section className="panel results-panel"><div className="section-header"><div><div className="section-kicker">OBSERVABILITY</div><h2>Experiment Results</h2></div>{report?<span className="success-tag"><CheckCircle2 size={14}/> COMPLETED</span>:<span className="soft-tag">NO RESULTS</span>}</div>
  {report?<><div className="results-grid"><div className="result-cell"><small>BASELINE THROUGHPUT</small><strong>{fmt(report.before.estimated_throughput_mbps)} <em>Mbps</em></strong></div><div className="result-cell"><small>AFTER FAULT</small><strong>{fmt(report.after.estimated_throughput_mbps)} <em>Mbps</em></strong></div><div className="result-cell"><small>BASELINE DELAY</small><strong>{fmt(report.before.baseline_delay_ms)} <em>ms</em></strong></div><div className="result-cell"><small>POST-FAULT DELAY</small><strong>{report.after.connected?fmt(report.after.baseline_delay_ms):"No route"} <em>{report.after.connected?"ms":""}</em></strong></div></div><div className="route-summary"><div><span>BASELINE PATH</span><strong>{report.before.path.join(" → ")||"Disconnected"}</strong></div><div><span>AFTER FAULT</span><strong>{report.after.path.join(" → ")||"Disconnected"}</strong></div><div><span>DIAGNOSIS</span><strong>{report.after.diagnosis.replace(/_/g," ")}</strong></div></div></>:<div className="empty-results"><Activity size={28}/><strong>No experiment data yet</strong><span>Configure a link fault and run an experiment to populate the comparison.</span></div>}</section>
+ <section className="panel measured-panel"><div className="section-header"><div><div className="section-kicker">MININET / IMPORT</div><h2>Measured Network Traffic</h2></div><span className="soft-tag">ICMP + TCP</span></div>
+ <p className="measured-intro">Import the JSON generated by the Ubuntu Mininet experiment. This is a separate measurement pipeline; it does not simulate traffic in the browser.</p>
+ <div className="measurement-actions"><input aria-label="Select Mininet JSON file" type="file" accept=".json,application/json" onChange={e=>{setMeasurementFile(e.target.files?.[0]||null);setMeasurementError("");}}/><button className="primary-button" disabled={!measurementFile||measurementBusy} onClick={importMeasurements}>{measurementBusy?"Analyzing...":"Analyze measurements"}</button></div>
+ {measurementError&&<p className="form-error" role="alert">{measurementError}</p>}
+ {measured?<><div className="results-grid"><div className="result-cell"><small>BASELINE TCP</small><strong>{measured.measurements.before.throughput_mbps===null?"N/A":fmt(measured.measurements.before.throughput_mbps)} <em>Mbps</em></strong></div><div className="result-cell"><small>FAULT TCP</small><strong>{measured.measurements.after.throughput_mbps===null?"N/A":fmt(measured.measurements.after.throughput_mbps)} <em>Mbps</em></strong></div><div className="result-cell"><small>BASELINE ICMP LOSS</small><strong>{measured.measurements.before.loss_percent===null?"N/A":fmt(measured.measurements.before.loss_percent)} <em>%</em></strong></div><div className="result-cell"><small>FAULT ICMP LOSS</small><strong>{measured.measurements.after.loss_percent===null?"N/A":fmt(measured.measurements.after.loss_percent)} <em>%</em></strong></div></div><div className="measurement-evidence"><strong>Evidence</strong><span>{measured.evidence.join(" · ")||"No threshold evidence"}</span><strong>Data quality</strong><span>{measured.quality_flags.length?measured.quality_flags.join(" · "):"No parser flags"}</span></div></>:<div className="empty-results"><Activity size={26}/><strong>No Mininet measurement imported</strong><span>Generate an experiment JSON on Ubuntu, then select it above.</span></div>}</section>
  <footer className="page-footer"><span>NETFAULT LAB · SCIENTIFIC RESEARCH ENVIRONMENT</span><span>ESTIMATES ≠ MEASUREMENTS</span></footer>
  </main></div>;
 }
