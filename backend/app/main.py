@@ -1,0 +1,33 @@
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from .engine import diagnose_fault, evaluate
+from .models import FaultExperiment, TrafficExperiment
+
+app = FastAPI(title="Intelligent Network Fault Diagnosis API", version="0.1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
+
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok", "engine": "analytical-baseline", "version": "0.1.0"}
+
+
+@app.post("/api/experiments/analytical")
+def experiment(payload: TrafficExperiment):
+    try:
+        return evaluate(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/experiments/link-fault")
+def fault(payload: FaultExperiment):
+    try:
+        return diagnose_fault(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
