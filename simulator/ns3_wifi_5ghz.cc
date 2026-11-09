@@ -1,4 +1,4 @@
-// Wi-Fi 5 GHz UDP experiment using ns-3 (standalone scratch program).
+// Wi-Fi 2.4/5 GHz UDP experiment using ns-3 (standalone scratch program).
 // Requires a supported ns-3 release with wifi, internet, mobility, applications,
 // and flow-monitor modules. Results are simulated packet-level observations,
 // NOT measurements from physical wireless hardware.
@@ -17,19 +17,21 @@
 using namespace ns3;
 
 int main(int argc, char** argv) {
+  std::string band = "5";
   double distance = 25.0;
   double duration = 20.0;
   double offeredMbps = 5.0;
   uint32_t seed = 1;
   uint32_t run = 1;
   CommandLine cmd;
+  cmd.AddValue("band", "Wi-Fi band: 2.4 or 5 (802.11g or 802.11a)", band);
   cmd.AddValue("distance", "STA-to-AP distance in metres", distance);
   cmd.AddValue("duration", "Application measurement duration in seconds", duration);
   cmd.AddValue("offeredMbps", "UDP offered traffic Mbps", offeredMbps);
   cmd.AddValue("seed", "ns-3 random seed", seed);
   cmd.AddValue("run", "ns-3 independent run number", run);
   cmd.Parse(argc, argv);
-  if (distance <= 0 || distance > 1000 || duration < 2 || duration > 300 ||
+  if ((band != "2.4" && band != "5") || distance <= 0 || distance > 1000 || duration < 2 || duration > 300 ||
       offeredMbps <= 0 || offeredMbps > 1000 || seed == 0 || run == 0) {
     std::cerr << "Invalid experiment parameters" << std::endl;
     return 2;
@@ -44,7 +46,7 @@ int main(int argc, char** argv) {
   YansWifiPhyHelper phy;
   phy.SetChannel(channel.Create());
   WifiHelper wifi;
-  wifi.SetStandard(WIFI_STANDARD_80211a);
+  wifi.SetStandard(band == "2.4" ? WIFI_STANDARD_80211g : WIFI_STANDARD_80211a);
   wifi.SetRemoteStationManager("ns3::ConstantRateWifiManager",
                                "DataMode", StringValue("OfdmRate24Mbps"),
                                "ControlMode", StringValue("OfdmRate6Mbps"));
@@ -97,7 +99,10 @@ int main(int argc, char** argv) {
   monitor->CheckForLostPackets();
   uint64_t txPackets = 0, rxPackets = 0, rxBytes = 0;
   double delaySumSeconds = 0.0;
+  Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier>(monitorHelper.GetClassifier());
   for (const auto& [id, flow] : monitor->GetFlowStats()) {
+    const auto tuple = classifier->FindFlow(id);
+    if (tuple.destinationAddress != apIf.GetAddress(0) || tuple.destinationPort != port || tuple.protocol != 17) continue;
     if (flow.txPackets == 0) continue;
     txPackets += flow.txPackets;
     rxPackets += flow.rxPackets;
@@ -109,7 +114,7 @@ int main(int argc, char** argv) {
   double avgDelayMs = rxPackets ? 1000.0 * delaySumSeconds / rxPackets : 0.0;
   std::cout << std::fixed << std::setprecision(5)
             << "{\"mode\":\"ns3_wifi_packet_simulation\","
-            << "\"standard\":\"802.11a_5ghz\","
+            << "\"standard\":\"" << (band == "2.4" ? "802.11g_2.4ghz" : "802.11a_5ghz") << "\","
             << "\"seed\":" << seed << ",\"run\":" << run
             << ",\"distance_m\":" << distance
             << ",\"duration_s\":" << duration
