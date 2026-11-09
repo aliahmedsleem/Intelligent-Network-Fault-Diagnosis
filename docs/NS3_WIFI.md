@@ -37,3 +37,18 @@ Validate model assumptions before extrapolating to actual wireless networks.
 
 Do not treat the analytical `/api/models/link-budget` output as a packet
 simulation; it is a separate power-budget calculation.
+
+## Import into the dashboard
+
+After running the ns-3 scratch experiment, save the single JSON line printed
+by the program into a file such as `wifi-run-01.json` (exclude ns-3 build
+messages or other console text). In the web dashboard, select **ns-3 Wi-Fi**,
+choose that file, and press **Inspect result**.
+
+The browser sends the JSON to `POST /api/ns3/wifi/inspect`. The API validates
+the expected schema and checks packet-loss consistency, packet counts, and
+suspiciously high throughput relative to offered load. It returns quality
+flags rather than modifying the experiment data. Import does not execute ns-3.
+
+To create a clean file from terminal output, copy only the line beginning with
+`{"mode":"ns3_wifi_packet_simulation"` into a UTF-8 JSON file.
