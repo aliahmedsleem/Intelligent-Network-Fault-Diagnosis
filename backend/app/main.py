@@ -113,3 +113,6 @@ def inspect_ns3_wifi_result(payload: Ns3WifiRun):
 
 from .gns3_adapter import router as gns3_router
 app.include_router(gns3_router)
+
+from .physical_network import router as physical_router
+app.include_router(physical_router)
