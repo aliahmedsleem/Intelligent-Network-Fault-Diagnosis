@@ -66,3 +66,96 @@ def ping(request: ProbeRequest):
         raise HTTPException(status_code=501, detail="Unsupported host operating system")
     result = run_command(args, timeout=9)
     return {"source": "active_icmp_probe", "target": target, "result": result, "note": "ICMP failures alone do not prove that a host or link is down."}
+
+
+def _powershell_json(script: str):
+    result = run_command(["powershell", "-NoProfile", "-NonInteractive", "-Command", script], timeout=12)
+    if result["exit_code"] != 0:
+        raise HTTPException(status_code=503, detail="Windows network information is unavailable")
+    try:
+        return __import__("json").loads(result["output"])
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail="Windows network information could not be parsed") from exc
+
+
+@router.get("/active")
+def active_network():
+    """Detect the Windows interface used for the default IPv4 route."""
+    if platform.system() != "Windows":
+        raise HTTPException(status_code=501, detail="Automatic active-interface detection currently requires Windows")
+    script = """
+$ErrorActionPreference = 'Stop'
+$r = Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' |
+ Where-Object { $_.NextHop -ne '0.0.0.0' } |
+ Sort-Object RouteMetric,InterfaceMetric | Select-Object -First 1
+if (-not $r) { throw 'No IPv4 default route' }
+$a = Get-NetAdapter -InterfaceIndex $r.InterfaceIndex
+$ip = Get-NetIPAddress -InterfaceIndex $r.InterfaceIndex -AddressFamily IPv4 |
+ Where-Object { $_.IPAddress -notlike '169.254.*' } | Select-Object -First 1
+$dns = @(Get-DnsClientServerAddress -InterfaceIndex $r.InterfaceIndex -AddressFamily IPv4 |
+ Select-Object -ExpandProperty ServerAddresses)
+[pscustomobject]@{
+ interface_index=$r.InterfaceIndex; interface_name=$a.Name;
+ interface_description=$a.InterfaceDescription; status=$a.Status;
+ link_speed=$a.LinkSpeed; mac_address=$a.MacAddress;
+ connection_type=$(if ($a.NdisPhysicalMedium -match 'Wireless|802.11' -or $a.InterfaceDescription -match 'Wi-Fi|Wireless|802.11') {'wifi'} else {'ethernet_or_other'});
+ ipv4=$ip.IPAddress; prefix_length=$ip.PrefixLength;
+ gateway=$r.NextHop; dns_servers=$dns
+} | ConvertTo-Json -Compress -Depth 4
+"""
+    data = _powershell_json(script)
+    wifi = None
+    if data.get("connection_type") == "wifi":
+        # netsh reports signal quality as a percentage, not calibrated RSSI.
+        raw = run_command(["netsh", "wlan", "show", "interfaces"], timeout=8)
+        lines = raw["output"].splitlines()
+        for line in lines:
+            if ":" not in line:
+                continue
+            key, value = (s.strip() for s in line.split(":", 1))
+            if key.lower() in {"ssid", "bssid", "signal", "radio type", "channel", "receive rate (mbps)", "transmit rate (mbps)"}:
+                if wifi is None:
+                    wifi = {}
+                wifi[key.lower().replace(" ", "_")] = value
+    return {"source": "windows_active_route", "interface": data, "wifi": wifi,
+            "note": "Detected from the Windows default IPv4 route; Wi-Fi signal is OS-reported quality, not RSSI."}
+
+
+@router.get("/diagnose")
+def diagnose_active_network():
+    """Conservative, read-only diagnostics from the computer's active route."""
+    import socket
+    connection = active_network()
+    interface = connection["interface"]
+    gateway = interface.get("gateway")
+    if not gateway:
+        return {"connection": connection, "status": "no_gateway", "findings": ["No default gateway detected"], "checks": {}}
+    gateway_ping = run_command(["ping", "-n", "3", "-w", "1500", gateway], timeout=9)
+    dns_ok = False
+    dns_error = None
+    try:
+        socket.getaddrinfo("example.com", 443, type=socket.SOCK_STREAM)
+        dns_ok = True
+    except OSError as exc:
+        dns_error = type(exc).__name__
+    findings = []
+    if interface.get("status", "").lower() != "up":
+        findings.append("The selected network adapter is not reported as Up")
+    if gateway_ping["exit_code"] != 0:
+        findings.append("Gateway did not answer ICMP; this can also be caused by ICMP filtering")
+    if not dns_ok:
+        findings.append("DNS resolution failed from this computer")
+    if connection.get("wifi"):
+        signal = connection["wifi"].get("signal", "")
+        match = re.search(r"(\d+)\s*%", signal)
+        if match and int(match.group(1)) < 40:
+            findings.append("Wi-Fi signal quality is low according to Windows")
+    return {
+        "source": "windows_active_network_diagnostics",
+        "connection": connection,
+        "status": "potential_issues" if findings else "no_issues_detected_by_limited_checks",
+        "findings": findings,
+        "checks": {"gateway_icmp": {"target": gateway, **gateway_ping},
+                   "dns_lookup": {"hostname": "example.com", "success": dns_ok, "error": dns_error}},
+        "note": "Preliminary evidence only. A failed ICMP probe does not prove a gateway failure; DNS success does not prove internet connectivity."
+    }
