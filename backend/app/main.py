@@ -31,3 +31,88 @@ def fault(payload: FaultExperiment):
         return diagnose_fault(payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+from .measurements import MeasuredRun, analyze
+
+
+@app.post("/api/measurements/analyze")
+def analyze_measurements(payload: MeasuredRun):
+    """Analyze imported Mininet measurements; never launch privileged commands."""
+    return analyze(payload)
+
+from .localization import LocalizationRequest, localize
+
+
+@app.post("/api/localization/analyze")
+def analyze_localization(payload: LocalizationRequest):
+    try:
+        return localize(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+from .probe_pipeline import ProbeBatch, analyze_batch
+
+
+@app.post("/api/localization/probe-batch")
+def analyze_measured_probe_batch(payload: ProbeBatch):
+    try:
+        return analyze_batch(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+from .remediation import RemediationReport, analyze_remediation
+
+
+@app.post("/api/remediation/analyze")
+def analyze_remediation_report(payload: RemediationReport):
+    return analyze_remediation(payload)
+
+from .lifecycle import LifecycleRequest, plan_lifecycle
+
+
+@app.post("/api/lifecycle/plan")
+def create_lifecycle_plan(payload: LifecycleRequest):
+    try:
+        return plan_lifecycle(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+from .evaluation import EvaluationDataset, evaluate_dataset
+
+
+@app.post("/api/evaluation/localization")
+def evaluate_localization_trials(payload: EvaluationDataset):
+    try:
+        return evaluate_dataset(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+from .closed_loop import ClosedLoopArtifact, inspect_closed_loop
+
+
+@app.post("/api/lifecycle/inspect")
+def inspect_measured_lifecycle(payload: ClosedLoopArtifact):
+    try:
+        return inspect_closed_loop(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+from .medium_models import MediumBudgetRequest, calculate_budget
+
+
+@app.post("/api/models/link-budget")
+def evaluate_medium_budget(payload: MediumBudgetRequest):
+    return calculate_budget(payload)
+
+from .ns3_results import Ns3WifiRun, inspect_ns3_run
+
+
+@app.post("/api/ns3/wifi/inspect")
+def inspect_ns3_wifi_result(payload: Ns3WifiRun):
+    return inspect_ns3_run(payload)
+
+from .gns3_adapter import router as gns3_router
+app.include_router(gns3_router)
+
+from .physical_network import router as physical_router
+app.include_router(physical_router)
